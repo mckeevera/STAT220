@@ -1,0 +1,123 @@
+---
+title: "The Impact of Climate Classification on Daily Temperature Prediction"
+author: "Alex McKeever"
+date: 10/18/2023
+output: pdf_document
+---
+
+One of the most important predictions people use on a daily basis is the weather forecast as information about temperature and humidity is useful. Unfortunately, the weather prediction is just that, a prediction. It is not always completely accurate and there are many times when the predicted temperature is far off from the actual temperature. Using data from the National Weather Service, it appears that some areas in the United States struggle more with temperature prediction than others, whether it be for estimating the daily high or the daily low. Two data frames from the National Weather Service were joined together in order to make the following graphics. The weather forecasts data frame contained over a year's worth of weather predictions and actual weather results for 160 cities in the United States. This weather information included forecast outlook, such as sunny or mostly cloudy, temperature, and precipitation. The city forecast data frame, meanwhile, included information about 236 cities with their coordinates, elevations, and various annual weather statistics such as wind speed and precipitation. Also included was the Köppen climate classification for each city.
+
+The maps below show the location of 154 cities within the contiguous United States. The first graphic depicts the average amount of degrees that each city is off by on temperature predictions for daily highs and daily lows. These predictions were all established 12 hours before the weather actually occurred. Darker red circles indicate that the city is worse at predicting temperatures, while lighter points mean that the city is better at predicting temperatures. The second map shows the same cities and their respective second level Köppen climate classification. Overall, it appears that the climate type a city exists in has some relationship with how well they are able to predict temperatures as areas with drier climates tend to have worse predictions.
+
+```{r library, echo = FALSE, message = FALSE}
+#Loading required packages
+library(tidyverse)
+library(dplyr)
+library(ggmap)
+library(lubridate)
+library(grafify)
+```
+
+```{r loading data, echo = FALSE}
+#Loading in the data
+weather <- read.csv("https://www.math.carleton.edu/ckelling/data_science/weather_forecasts.csv")
+cities <- read.csv("https://www.math.carleton.edu/ckelling/data_science/forecast_cities.csv")
+meaning <- read.csv("https://www.math.carleton.edu/ckelling/data_science/outlook_meanings.csv")
+```
+
+```{r merge, echo = FALSE}
+#Adding infromation from the cities data set to the weather data set to have more information about each city including latitude, longitude, and koppen
+data <- weather %>% left_join(cities, by = c("city", "state"))
+```
+
+```{r mutate, echo = FALSE}
+#Creating new columns in the data set that include the difference in predicted and actual temperature
+data <- data %>% mutate(diff_temp = observed_temp - forecast_temp) %>%
+  #The magnitude of that difference
+  mutate(off_by = abs(diff_temp)) %>%
+  #Month
+  mutate(month = month(date)) %>%
+  #Year
+  mutate(year = year(date)) %>%
+  #First aspect of koppen
+  mutate(koppen1 = str_sub(koppen, 1, 1)) %>%
+  #Second aspect of koppen
+  mutate(koppen2 = str_sub(koppen, 2, 2))
+```
+
+```{r filter, echo = FALSE}
+#Creating new data sets that focus on the final prediction to ensure averages will be calculated correctly
+data_12 <- data %>%
+  filter(forecast_hours_before == 12)
+```
+
+```{r calculate means, echo = FALSE}
+#Calculating averages by city, koppen, and individual aspects of koppen
+data_12 <- data_12 %>%
+  group_by(city) %>%
+  mutate(city_avg_diff = mean(off_by, na.rm = TRUE)) %>%
+  group_by(koppen) %>%
+  mutate(koppen_avg_diff = mean(off_by, na.rm = TRUE)) %>%
+  group_by(koppen1) %>%
+  mutate(koppen1_avg_diff = mean(off_by, na.rm = TRUE)) %>%
+#Koppen 2 averages used for numbers in discussion paragraphs
+  group_by(koppen2) %>%
+  mutate(koppen2_avg_diff = mean(off_by, na.rm = TRUE)) %>%
+  mutate(koppen2_avg_diff_rain = mean(avg_annual_precip, na.rm = TRUE))
+#Making a data set without city overlap to plot data quickly
+plot_data <- data_12 %>%
+  group_by(city) %>%
+  summarize(city_avg_diff = mean(off_by, na.rm = TRUE), lon = mean(lon), 
+            lat = mean(lat), avg_annual_precip = mean(avg_annual_precip))
+```
+
+```{r US Map, echo = FALSE, message = FALSE}
+#Loading in the U.S. map
+map <- ggmap(get_stadiamap(c(left = -125.68, bottom = 24,
+                  right = -66.68, top = 49.7), zoom = 4)) 
+```
+
+```{r Temp Map, warning = FALSE, echo = FALSE}
+map +
+  geom_point(data = plot_data, 
+             mapping = aes(x = lon, y = lat, color = city_avg_diff)) + 
+  #Adding better color scheme and adding numbers to legend scale
+  scale_color_grafify(palette = "yellow_conti", 
+                      labels = c(1.5, 2, 2.5, 3, 3.5), 
+                      breaks = c(1.5, 2, 2.5, 3, 3.5)) +
+  #Labels
+  labs(title = "Average Disparity Between Predicted and Actual Temperature", 
+       color = "°F", 
+       caption = "Data from National Weather Service - Maps from Stamen Design", 
+       subtitle = "1/30/2021 - 6/1/2022") +
+  #Removing latitude and longitude, polishing legend position and visuals
+  theme(axis.title = element_blank(), 
+        axis.text = element_blank(), axis.ticks = element_blank(),
+        legend.position = c(0.9, 0.2), legend.key.size = unit(0.18, "in"), 
+        legend.background = element_rect("lightgray"))
+```
+
+```{r Koppen Map, warning = FALSE, echo = FALSE}
+map +
+  geom_point(data = data_12, mapping = aes(x = lon, y = lat, color = koppen2)) +
+  #Better color scheme and legend labels
+  scale_color_grafify(palette = "r4", 
+                      labels = c("Rainforrest/No Dry Season", "Monsoon", 
+                                 "Dry Summer", "Semi-Arid/Steppe", "Dry Winter", 
+                                 "Arid Desert")) +
+  labs(title = "Köppen Climate Classifications", color = "Climate Type", 
+       caption = "Data from National Weather Service - Maps from Stamen Design") +
+    #Removing latitude and longitude, polishing legend position and visuals
+  theme(axis.title = element_blank(), 
+        axis.text = element_blank(), axis.ticks = element_blank(), 
+        legend.key.size = unit(0.18, "in"), 
+        legend.background = element_rect("lightgray"))
+```
+
+When looking at the first graphic, it becomes apparent that there are indeed areas of the United States that are worse at predicting future temperatures on average. There looks to be a split vertically down the country along the western border of Minnesota and Iowa, with cities to the East being off by less than two degrees on average and those to the west being off by more than two on average. This trend is not ubiquitous, however, as there are cities in the east that struggle, like Elkins, WV, and cities in the west that excel, including many of those on the West Coast. Cities near the Rocky Mountains, which includes all four Montana cities in the data set, particularly seems to struggle.
+
+These geographical findings also seem to have an association with the Köppen climate classification of each city. Specifically, the second level of Köppen classification and by extension the amount of annual precipitation a city gets. Most of the Rocky Mountain area cities are classified as a semi-arid or steppe climate that typically has very little annual precipitation. The cities on the West Coast typically have a dry summer and very little precipitation during that time, though they often have a decent amount of precipitation in other seasons. Nearly all of the eastern United States is either a rainforest climate or contains no dry season whatsoever. The average annual precipitation for semi-arid, dry summer, and no dry season climates were 15.02, 24.57, and 45.36 inches, respectively. The number of degrees that cities in these climate classifications were typically off by were 2.48, 2.17, and 2.08 for semi-arid, dry summer, and no dry season. From this, it seems as if the more annual precipitation a city gets, the better it is at actually predicting daily high and daily low temperatures. This pattern could be because cities with more precipitation may spend more time and resources on weather predictions. Alternatively, the lack of precipitation may increase variability and unpredictability in weather trends.
+
+Although Alaska and Hawaii are not included within the maps, the trend seems to be similar for the two states. Honolulu is classified as having a dry summer and was typically off by 2.06 degrees and had 32.65 inches of average annual precipitation meaning it is slightly better at predicting temperatures than the typical dry summer city or no dry season city. However, its average annual precipitation is between the two city types. All Alaskan cities are classified as having no dry season according to the data, but Anchorage and Fairbanks have less than 20 inches of annual precipitation and over 2.5 degrees of error on temperature predictions meaning they follow the precipitation trend. Juneau, however, was off by 2.41 degrees on average, yet had 111.1 inches of annual precipitation meaning it does not quite follow the observed trend other cities tend to follow.
+
+It is crucial to note the limitations of these graphics, however. The required tests to determine if the differences between these climate types are statistically significant were not implemented and thus the observed trends could have occurred due to random chance. Furthermore, it can not be confidently said that the climate type or lack of annual precipitation is the reason why some areas appear to struggle more than others, even though there does seem to be a trend within the time frame of the data.
