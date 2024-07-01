@@ -13,3 +13,5 @@ This project had me explore State of the Union Addressees using stringr.
 
 ### Final Project
 Completed with the wonderful Aaryan Gulati, this project was focused on creating a Shiny App. We opted to look at NFL stats. The site can be found here: https://mckeevera.shinyapps.io/HowToWinTheSuperBowl/
+
+Contact me at mckeevera@carleton.edu or alexmckeever25@gmail.com if you want to see the data or code for this project.
