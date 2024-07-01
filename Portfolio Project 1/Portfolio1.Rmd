@@ -1,0 +1,97 @@
+---
+title: "Mapping Civilian Injuries Resulting from Police Force Use"
+author: "Alex McKeever"
+date: 09/29/2023
+output: pdf_document
+---
+
+Within the city of Minneapolis there are many instances where police use force in their encounters with civilians. Notably, there are many differences between these events, including if the police actually caused bodily harm to a civilian, depending on which neighborhood the event occurred in. Using data from Open Minneapolis, which contains 39,718 instances of police using force, the following visualization was constructed. These instances contained data on variables including race, type of force used, and the neighborhood in which the event took place. This graphic focuses on the data for the neighborhoods of Downtown East, Linden Hills, Bancroft, and the University of Minnesota.
+
+The maps below showcase the instances of police force within these Minneapolis neighborhoods. Green circles represent an instance where force was used and the civilian was injured, while red circles represent when the civilian was not injured. Gray circles depict instances where data was not recorded regarding if the subject sustained injuries or not. It is important to note that the actual location of the events are privatized by the Minneapolis Police. Thus, the location of points was slightly randomized using "geom_jitter" to account for the fact that the locations are not exact.
+
+Overall, it appears that neighborhoods closer to the city limits (Linden Hills and Bancroft) tend to have a higher proportion of events that result in civilian injury when compared to neighborhoods near the center of the city (Downtown East and the University of Minnesota).
+
+```{r, message = FALSE, echo = FALSE}
+library(grafify)
+library(dplyr)
+library(ggplot2)
+library(ggmap)
+library(patchwork)
+MN_puof <- readr::read_csv(
+  "https://www.math.carleton.edu/ckelling/data_science/MN_Police_Use_of_Force.csv")
+```
+
+```{r Filtering, echo = FALSE}
+MN_puof_subset <- filter(MN_puof, Neighborhood %in% 
+      c("Downtown East", "Linden Hills", "Bancroft", "University of Minnesota"))
+MN_puof_Downtown <- filter(MN_puof, Neighborhood %in% 
+      c("Downtown East", "University of Minnesota"))
+MN_puof_Linden <- filter(MN_puof, Neighborhood %in% 
+      c("Linden Hills"))
+MN_puof_Bancroft <- filter(MN_puof, Neighborhood %in% 
+      c("Bancroft"))
+```
+
+```{r Bars, echo = FALSE}
+BarChart <- ggplot(data = MN_puof_subset) + 
+  geom_bar(mapping = aes(fill = SubjectInjury, x = Neighborhood), 
+          position = "dodge", color = "black") + 
+  theme_light() +
+  scale_fill_manual(values = c("#DF536B", "#61D04F")) + 
+  scale_y_continuous(expand = expansion(mult = c(0, 0))) +
+  labs(y = "Count", fill = "Subject Injury", 
+       title = "Count of Events of Police Force Use by Subject Injury") +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), 
+        panel.border = element_blank(), axis.line = element_line(color = 'black'),
+        legend.position = c(0.8, 0.76), legend.key.size = unit(0.6, "in"))
+```
+
+```{r, Downtown Map, message = FALSE, echo = FALSE}
+set.seed(4111)
+DowntownMap <- ggmap(get_map(c(left = -93.265, bottom = 44.968, 
+                right = -93.22, top = 44.983), source = "stamen")) +
+geom_jitter(data = MN_puof_Downtown, mapping = aes(x = X, y = Y, color = SubjectInjury), 
+            alpha = 0.5, width = 0.0008, height = 0.0008, size = 3) +
+  labs(title = "Downtown East and the University of Minnesota") +
+   scale_color_manual(values = c("#DF536B", "#61D04F")) + 
+  theme(legend.position = "null", axis.title = element_blank(), 
+        axis.text = element_blank(), axis.ticks = element_blank())
+```
+
+```{r, Linden Hills Map, message = FALSE, echo = FALSE}
+set.seed(4111)
+LindenHillsMap <- ggmap(get_map(c(left = -93.34, bottom = 44.915, 
+                right = -93.3, top = 44.94), source = "stamen")) +
+geom_jitter(data = MN_puof_Linden, mapping = aes(x = X, y = Y, color = SubjectInjury), 
+            alpha = 0.5, width = 0.0008, height = 0.0008, size = 3) +
+  labs(title = "Linden Hills") +
+  scale_color_manual(values = c("#DF536B", "#61D04F")) + 
+  theme(legend.position = "null", axis.title = element_blank(), 
+        axis.text = element_blank(), axis.ticks = element_blank())
+```
+
+```{r, Bancroft Map, message = FALSE, echo = FALSE}
+set.seed(4111)
+BancroftMap <- ggmap(get_map(c(left = -93.268, bottom = 44.923, 
+                right = -93.24, top = 44.94), source = "stamen")) +
+geom_jitter(data = MN_puof_Bancroft, mapping = aes(x = X, y = Y, color = SubjectInjury), 
+            alpha = 0.5, width = 0.0008, height = 0.0008, size = 3) +
+  labs(title = "Bancroft") +
+  scale_color_manual(values = c("#DF536B", "#61D04F")) + 
+  theme(legend.position = "null", axis.title = element_blank(), 
+        axis.text = element_blank(), axis.ticks = element_blank()) 
+```
+
+```{r, warning = FALSE, fig.dim = c(12,12), echo = FALSE}
+DowntownMap / (BancroftMap + LindenHillsMap) / BarChart + 
+  plot_layout(heights=c(2,2), nrow=3) +
+  plot_annotation(
+      title = "Map of Civilian Injuries",
+      caption = "Data from Open Minneapolis - Maps from Stamen Design", 
+      theme = theme(plot.title = element_text(size = 30)) &
+        theme(plot.caption = element_text(size = 12)))
+```
+
+The first map above showcases the data for Downtown East (left of the river) and the University of Minnesota (right of the river). The following two maps show the data for Bancroft and Linden Hills, respectively. The bar chart depicts the number of instances of police force categorized by if the subject was injured or not for each neighborhood. This chart reveals that Bancroft and Linden Hills had a higher proportion of instances of police force resulting in subject injury than Downtown East and the University of Minnesota. Interestingly, a majority of the cases that resulted in subject injury in Linden Hills occurred on the west side of the neighborhood. Conversely, the west side of Bancroft contained very few instances of subject injury. The University of Minnesota also contains a geographical trend as there appears to be more instances of injury in the northwest part of the neighborhood.
+
+There are some important limitations to consider regarding this data and visualization. Sixty-four events did not include location data and thus were not included within the maps; they are, however, represented in the bar chart if they contained information about subject injury. For entries without data on subject injury, it is feasible that they contain systematic underreporting in certain areas of neighborhoods, making it difficult to know if the proposed findings are accurate. Finally, these visualizations show a difference in proportions of subject injury between the neighborhoods closer to, and further from, the center of the city, but a conclusion that there is an actual statistically significant difference can not be made as the tests required to determine that were not conducted.
